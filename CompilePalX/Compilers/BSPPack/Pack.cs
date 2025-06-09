@@ -747,6 +747,46 @@ namespace CompilePalX.Compilers.BSPPack
                     }
                 }
 
+                // Add support for parsing mount.cfg, adding to pack search paths.
+                string mountCfgPath = Path.Combine(gamePath, "cfg", "mount.cfg");
+                if (File.Exists(mountCfgPath))
+                {
+                    try
+                    {
+                        // Parse as KeyValues
+                        using var mountCfgFile = File.OpenRead(mountCfgPath);
+                        var mountCfg = KVSerializer.Deserialize(mountCfgFile);
+    
+                        foreach (var mountEntry in mountCfg.Children)
+                        {
+                            var value = mountEntry.Value?.ToString()?.Trim('"', ' ', '\t');
+                            if (string.IsNullOrEmpty(value))
+                                continue;
+    
+                            string fullPath = value;
+                            if (!Path.IsPathRooted(fullPath))
+                            {
+                                fullPath = Path.GetFullPath(Path.Combine(gamePath, fullPath));
+                            }
+    
+                            if (Directory.Exists(fullPath))
+                            {
+                                sourceDirectories.Add(fullPath);
+                                if (verbose)
+                                    CompilePalLogger.LogLine($"Found mount.cfg search path: {fullPath}");
+                            }
+                            else
+                            {
+                                CompilePalLogger.LogCompileError($"mount.cfg path does not exist: {fullPath}", new Error($"mount.cfg path does not exist: {fullPath}", ErrorSeverity.Caution));
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        CompilePalLogger.LogCompileError($"Failed to read mount.cfg: {ex.Message}", new Error($"Failed to read mount.cfg: {ex.Message}", ErrorSeverity.Caution));
+                    }
+                }
+
 
                 //find Chaos engine game mount paths
                 var mountedDirectories = GetMountedGamesSourceDirectories(gameInfo, Path.Combine(gamePath, "cfg", "mounts.kv"));
